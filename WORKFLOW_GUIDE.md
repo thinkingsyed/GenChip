@@ -92,6 +92,109 @@ set_load 0.035 [all_outputs]
 
 ---
 
+## 🛠️ Complete CI Infrastructure Setup (`.github/workflows/openlane.yml`)
+
+Save this exact workflow in `.github/workflows/openlane.yml` in your repository:
+
+```yaml
+name: OpenLane 2 ASIC Hardening Flow
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      design:
+        description: 'Design to harden (folder name under designs/)'
+        required: true
+        default: 'counter'
+      pdk:
+        description: 'Target PDK (sky130A, gf180mcuC, etc.)'
+        required: true
+        default: 'sky130A'
+
+jobs:
+  harden:
+    name: Harden ASIC Design to GDSII
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OpenLane 2 & Volare
+        run: |
+          python -m pip install --upgrade pip
+          pip install openlane volare
+
+      - name: Cache PDK Cache (~/.volare)
+        uses: actions/cache@v4
+        with:
+          path: ~/.volare
+          key: ${{ runner.os }}-volare-${{ github.event.inputs.pdk || 'sky130A' }}
+          restore-keys: |
+            ${{ runner.os }}-volare-
+
+      - name: Run OpenLane 2 RTL-to-GDSII Flow
+        # CRITICAL: Allocates a virtual pseudo-terminal (PTY) to prevent "input device is not a TTY" error
+        shell: script -q -e -c "bash {0}"
+        run: |
+          DESIGN="${{ github.event.inputs.design || 'counter' }}"
+          PDK="${{ github.event.inputs.pdk || 'sky130A' }}"
+          echo "========================================="
+          echo "Hardening Design: $DESIGN"
+          echo "Target PDK:       $PDK"
+          echo "========================================="
+          
+          # Execute containerized OpenLane 2 flow inside allocated PTY
+          openlane --dockerized --pdk "$PDK" "designs/$DESIGN/config.json"
+
+      - name: Archive Layout Deliverables (GDSII, DEF, LEF)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layout-artifacts-${{ github.event.inputs.design || 'counter' }}
+          path: |
+            designs/**/runs/**/*.gds
+            designs/**/runs/**/*.def
+            designs/**/runs/**/*.lef
+          if-no-files-found: warn
+
+      - name: Archive Signoff Reports & Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signoff-reports-${{ github.event.inputs.design || 'counter' }}
+          path: |
+            designs/**/runs/**/reports/
+            designs/**/runs/**/logs/
+          if-no-files-found: warn
+```
+
+---
+
+## ⚠️ Common CI & Physical Design Errors & Solutions
+
+### 1. `the input device is not a TTY` (CI Runner Error)
+* **Cause**: `openlane --dockerized` internally invokes `docker run -it`, which requires a pseudo-terminal. Default headless GitHub Actions runners do not attach a TTY.
+* **Solution**: Add `shell: script -q -e -c "bash {0}"` to the hardening step. The Linux `script` utility allocates a virtual PTY wrapper so Docker executes smoothly.
+
+### 2. `[ERROR GPL-0302] Use a higher -density or re-floorplan with a larger core area` (Placement Error)
+* **Cause**: After synthesis and standard cell padding, actual cell utilization exceeds the configured `PL_TARGET_DENSITY_PCT`.
+* **Solution**: In `config.json`, lower `FP_CORE_UTIL` to `35` and increase `PL_TARGET_DENSITY_PCT` to `55` to give the placer enough margin.
+
+### 3. Slow CI Builds (200MB PDK Download Every Run)
+* **Cause**: Volare downloads the SkyWater 130nm PDK from scratch on every push.
+* **Solution**: Add `actions/cache@v4` on `~/.volare` to cache the PDK across commits.
+
+---
+
 ## 🧪 Testing Locally
 
 Run the simulation script to test any design before pushing:
@@ -108,24 +211,7 @@ python scripts/run_sim.py --design alu8
 
 ---
 
-## ☁️ Hardening to Silicon Layout via GitHub Actions
-
-1. Commit and push:
-   ```powershell
-   git add .
-   git commit -m "feat: add alu8 ASIC design"
-   git push origin main
-   ```
-2. Or trigger a manual build for any specific design via **Run workflow** under the Actions tab in GitHub:
-   - Design: `alu8`
-   - Target PDK: `sky130A` (or `gf180mcuC`)
-3. Download the generated ZIP deliverables:
-   - **`layout-artifacts-<design>`**: Contains `<design>.gds` (GDSII tapeout layout), `<design>.def`, and `<design>.lef`.
-   - **`signoff-reports-<design>`**: Contains Static Timing Analysis (STA) setup/hold slacks, DRC clean verification, and LVS reports.
-
----
-
-## 🔍 Inspecting the Layout
+## 🔍 Inspecting the Silicon Layout
 
 1. Download **[KLayout](https://www.klayout.de/)** (free for Windows, macOS, and Linux).
 2. Open `<design>.gds` in KLayout.
