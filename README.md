@@ -15,6 +15,10 @@ flowchart TD
     Actions --> GDS["6. Download GDSII / DEF / DRC Reports"]
 ```
 
+## 📖 Guides & Playbooks
+
+- **[Antigravity ASIC Playbook (WORKFLOW_GUIDE.md)](./WORKFLOW_GUIDE.md)**: Full guide with copy-pasteable prompt templates (ALU, UART, SPI, MAC, FIFO), P&R rules of thumb, and local simulation workflows.
+
 ---
 
 ## Directory Structure
