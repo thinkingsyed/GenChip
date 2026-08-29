@@ -29,12 +29,21 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install OpenLane 2 (LibreLane)
+      - name: Install OpenLane 2 & Volare
         run: |
           python -m pip install --upgrade pip
-          pip install openlane
+          pip install openlane volare
+
+      - name: Cache PDK Cache (~/.volare)
+        uses: actions/cache@v4
+        with:
+          path: ~/.volare
+          key: ${{ runner.os }}-volare-${{ github.event.inputs.pdk || 'sky130A' }}
+          restore-keys: |
+            ${{ runner.os }}-volare-
 
       - name: Run OpenLane 2 RTL-to-GDSII Flow
+        shell: script -q -e -c "bash {0}"
         run: |
           DESIGN="${{ github.event.inputs.design || 'counter' }}"
           PDK="${{ github.event.inputs.pdk || 'sky130A' }}"
@@ -43,7 +52,7 @@ jobs:
           echo "Target PDK:       $PDK"
           echo "========================================="
           
-          # Execute containerized OpenLane 2 flow
+          # Execute containerized OpenLane 2 flow inside allocated PTY
           openlane --dockerized --pdk "$PDK" "designs/$DESIGN/config.json"
 
       - name: Archive Layout Deliverables (GDSII, DEF, LEF)
@@ -52,9 +61,9 @@ jobs:
         with:
           name: layout-artifacts-${{ github.event.inputs.design || 'counter' }}
           path: |
-            designs/**/runs/*/final/gds/*.gds
-            designs/**/runs/*/final/def/*.def
-            designs/**/runs/*/final/lef/*.lef
+            designs/**/runs/**/*.gds
+            designs/**/runs/**/*.def
+            designs/**/runs/**/*.lef
           if-no-files-found: warn
 
       - name: Archive Signoff Reports & Logs
@@ -63,6 +72,6 @@ jobs:
         with:
           name: signoff-reports-${{ github.event.inputs.design || 'counter' }}
           path: |
-            designs/**/runs/*/reports/
-            designs/**/runs/*/logs/
+            designs/**/runs/**/reports/
+            designs/**/runs/**/logs/
           if-no-files-found: warn
