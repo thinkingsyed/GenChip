@@ -7,9 +7,8 @@
     "CLOCK_PERIOD": 10.0,
     "PNR_SDC_FILE": "dir::src/constraints.sdc",
     "SIGNOFF_SDC_FILE": "dir::src/constraints.sdc",
-    "FP_CORE_UTIL": 40,
+    "FP_CORE_UTIL": 35,
     "FP_ASPECT_RATIO": 1.0,
-    "PL_TARGET_DENSITY_PCT": 45,
-    "GRT_ALLOW_CONGESTION": false,
-    "PRIMARY_SIGNOFF_TOOL": "magic"
+    "PL_TARGET_DENSITY_PCT": 55,
+    "GRT_ALLOW_CONGESTION": false
 }
