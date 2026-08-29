@@ -1,0 +1,16 @@
+# Simulation artifacts
+*.vcd
+*.vvp
+*.log
+
+# OpenLane run artifacts (kept in CI artifacts)
+runs/
+designs/**/runs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
